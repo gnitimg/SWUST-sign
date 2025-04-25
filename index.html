@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SWUST 链接生成器</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1a5276;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 25px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+        input[type="text"], select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .time-input-group {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .time-input-group select, .time-input-group input {
+            height: 40px;
+            padding: 5px;
+            font-size: 16px;
+        }
+        .time-input-group button {
+            grid-column: span 3;
+            margin-top: 10px;
+        }
+        .action-group {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+        .action-group button {
+            flex: 1;
+            margin-right: 10px;
+        }
+        .action-group button:last-child {
+            margin-right: 0;
+        }
+        button {
+            background-color: #1a5276;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+        }
+        button:hover {
+            background-color: #154360;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .status-info {
+            background-color: #e7f5ff;
+            color: #1a5276;
+        }
+        .status-error {
+            background-color: #fff5f5;
+            color: #e03131;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>SWUST 签到链接生成器</h1>
+        
+        <div class="form-group">
+            <label for="original-url">原始链接</label>
+            <input type="text" id="original-url" placeholder="粘贴原始链接">
+        </div>
+        
+        <div class="form-group">
+            <label>目标时间</label>
+            <div class="time-input-group">
+                <select id="year"></select>
+                <select id="month"></select>
+                <select id="day"></select>
+            </div>
+            <div class="time-input-group">
+                <input type="number" id="hour" min="0" max="23" placeholder="时">
+                <input type="number" id="minute" min="0" max="59" placeholder="分">
+                <input type="number" id="second" min="0" max="59" placeholder="秒">
+            </div>
+            <button onclick="jumptime()">+10秒</button>
+        </div>
+        
+        <div class="action-group">
+            <button onclick="setCurrentTime()">当前时间</button>
+            <button onclick="generateLink()">生成链接</button>
+        </div>
+        
+        <div id="status" class="status"></div>
+    </div>
+
+    <script>
+        // 初始化日期选择器
+        (function initDateSelectors() {
+            const yearSelect = document.getElementById('year');
+            const currentYear = new Date().getFullYear();
+            for (let y = currentYear - 5; y <= currentYear + 5; y++) {
+                const option = document.createElement('option');
+                option.value = y;
+                option.text = y + '年';
+                yearSelect.appendChild(option);
+            }
+
+            const monthSelect = document.getElementById('month');
+            for (let m = 1; m <= 12; m++) {
+                const option = document.createElement('option');
+                option.value = m;
+                option.text = m + '月';
+                monthSelect.appendChild(option);
+            }
+
+            function updateDays() {
+                const year = parseInt(yearSelect.value);
+                const month = parseInt(monthSelect.value);
+                const days = new Date(year, month, 0).getDate();
+                
+                const daySelect = document.getElementById('day');
+                const currentDay = parseInt(daySelect.value) || 1;
+                daySelect.innerHTML = '';
+                
+                for (let d = 1; d <= days; d++) {
+                    const option = document.createElement('option');
+                    option.value = d;
+                    option.text = d + '日';
+                    daySelect.appendChild(option);
+                }
+                
+                // Preserve the selected day if it's still valid
+                if (currentDay <= days) {
+                    daySelect.value = currentDay;
+                }
+            }
+
+            yearSelect.addEventListener('change', updateDays);
+            monthSelect.addEventListener('change', updateDays);
+            updateDays();
+        })();
+
+        function setCurrentTime() {
+            const now = new Date();
+            
+            // Set all values first
+            document.getElementById('year').value = now.getFullYear();
+            document.getElementById('month').value = now.getMonth() + 1;
+            document.getElementById('day').value = now.getDate();
+            document.getElementById('hour').value = now.getHours();
+            document.getElementById('minute').value = now.getMinutes();
+            document.getElementById('second').value = now.getSeconds();
+            
+            // Then trigger the day update
+            document.getElementById('year').dispatchEvent(new Event('change'));
+            document.getElementById('month').dispatchEvent(new Event('change'));
+        }
+        
+        function jumptime() {
+            const secondInput = document.getElementById('second');
+            let currentSecond = parseInt(secondInput.value) || 0;
+            
+            // Add 10 seconds and handle overflow
+            let newSecond = currentSecond + 10;
+            let overflowMinutes = 0;
+            
+            if (newSecond >= 60) {
+                overflowMinutes = Math.floor(newSecond / 60);
+                newSecond = newSecond % 60;
+            }
+            
+            // Update seconds
+            secondInput.value = newSecond;
+            
+            // Handle minute overflow if needed
+            if (overflowMinutes > 0) {
+                const minuteInput = document.getElementById('minute');
+                let currentMinute = parseInt(minuteInput.value) || 0;
+                let newMinute = currentMinute + overflowMinutes;
+                let overflowHours = 0;
+                
+                if (newMinute >= 60) {
+                    overflowHours = Math.floor(newMinute / 60);
+                    newMinute = newMinute % 60;
+                }
+                
+                minuteInput.value = newMinute;
+                
+                // Handle hour overflow if needed
+                if (overflowHours > 0) {
+                    const hourInput = document.getElementById('hour');
+                    let currentHour = parseInt(hourInput.value) || 0;
+                    let newHour = currentHour + overflowHours;
+                    
+                    if (newHour >= 24) {
+                        newHour = newHour % 24;
+                    }
+                    
+                    hourInput.value = newHour;
+                }
+            }
+            
+            // Automatically update the generated link if there's already one
+            if (document.getElementById('status').textContent) {
+                generateLink();
+            }
+        }
+
+        function generateLink() {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = '';
+            statusDiv.textContent = '';
+
+            try {
+                const originalURL = document.getElementById('original-url').value.trim();
+                if (!originalURL) throw new Error("请输入原始链接");
+
+                const timeValues = {
+                    year: parseInt(document.getElementById('year').value),
+                    month: parseInt(document.getElementById('month').value) - 1,
+                    day: parseInt(document.getElementById('day').value),
+                    hour: parseInt(document.getElementById('hour').value) || 0,
+                    minute: parseInt(document.getElementById('minute').value) || 0,
+                    second: parseInt(document.getElementById('second').value) || 0,
+                    millisecond: 0
+                };
+
+                if (timeValues.hour < 0 || timeValues.hour > 23) throw new Error("小时数无效");
+                if (timeValues.minute < 0 || timeValues.minute > 59) throw new Error("分钟数无效");
+                if (timeValues.second < 0 || timeValues.second > 59) throw new Error("秒数无效");
+
+                const targetDate = new Date(
+                    timeValues.year,
+                    timeValues.month,
+                    timeValues.day,
+                    timeValues.hour,
+                    timeValues.minute,
+                    timeValues.second,
+                    timeValues.millisecond
+                );
+                const timestamp = targetDate.getTime();
+
+                const url = new URL(originalURL);
+                const params = new URLSearchParams(url.hash.split('?')[1]);
+                
+                // 更新 signByScanID
+                params.set('signByScanID', timestamp);
+
+                // 保留原始 URL 的 hash 部分
+                const newURL = `${url.origin}${url.pathname}#${url.hash.split('#')[1].split('?')[0]}?${params.toString()}`;
+
+                // 显示跳转按钮
+                statusDiv.className = 'status status-info';
+                statusDiv.innerHTML = `<button onclick="window.location.href='${newURL}'">跳转到目标网址</button>`;
+
+            } catch (error) {
+                statusDiv.textContent = error.message;
+                statusDiv.className = 'status status-error';
+                console.error(error);
+            }
+        }
+    </script>
+</body>
+</html>
